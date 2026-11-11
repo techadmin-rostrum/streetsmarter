@@ -12,7 +12,7 @@ import { ImpactView } from '../components/impact/ImpactView'
 import { ApplySection } from '../components/apply/ApplySection'
 export { ImpactView as Impact }
 import { Breadcrumb, InstagramIcon } from '../components/layout/Shell'
-import { api, resolveImage } from '../lib/api'
+import { api } from '../lib/api'
 import { resources, faqs, downloadGroups, quizQuestions, pillarSlug, learnCopy, builtinSchemes } from '../data/content'
 
 function LiveFeed({category,title,items:given,flush=true,query=''}){
@@ -64,13 +64,17 @@ export function Learning(){
   const [lang,setLang]=useLang()
   const overrides=useLessonOverrides()
   const t=pageHi.blog[lang]
-  const lessons=resources.map(r=>localiseLesson(r,lang,overrides))
-  const topics=['all',...Array.from(new Set(lessons.map(r=>r.topic)))]
+  const [posts,setPosts]=useState([])
   const [tag,setTag]=useState('all')
   const [q,setQ]=useState('')
+  useEffect(()=>{let alive=true;api.publicPosts().then(d=>{if(alive)setPosts(d)}).catch(()=>{if(alive)setPosts([])});return()=>{alive=false}},[])
   useEffect(()=>setTag('all'),[lang])
+  const lessons=resources.map(r=>localiseLesson(r,lang,overrides))
+  const stories=posts.map(p=>localPost(p,lang))
+  const topics=['all',...Array.from(new Set([...lessons.map(r=>r.topic),...stories.map(p=>p.tag).filter(Boolean)]))]
   const filtered=lessons.filter(r=>(tag==='all'||r.topic===tag)&&textMatch(q,r.title,r.topic,(r.body||[]).join(' ')))
-  return <><PageHero tag={t.tag} title={t.title} copy={t.copy} crumbs={['Blog']} aside={<div className="panel-block p-6"><p className="eyebrow !text-ink/60">{t.tag}</p><p className="mt-2 font-display text-6xl font-extrabold text-navy">{resources.length}</p><p className="mt-1 font-semibold text-navy">{t.count}</p><p className="mt-4 border-t-2 border-navy/10 pt-4 text-sm text-ink/75">{t.side} <Link to="/learn" className="font-bold text-signal">{t.sideLink}</Link></p></div>}><LangToggle lang={lang} onChange={setLang}/><div className="mt-5"><SearchBar value={q} onChange={setQ} placeholder={t.search}/></div></PageHero><section className="section"><TagFilter tags={topics.map(x=>x==='all'?t.all:x)} active={tag==='all'?t.all:tag} onChange={x=>setTag(x===t.all?'all':x)}/><div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{filtered.length?filtered.map(r=><ResourceCard key={r.slug} slug={r.slug} title={r.title} topic={r.topic} time={lang==='hi'?r.time.replace('min','मिनट'):r.time} readLabel={t.read}/>):<EmptyState>{t.empty}</EmptyState>}</div></section></>
+  const shownPosts=stories.filter(p=>(tag==='all'||p.tag===tag)&&textMatch(q,p.title,p.excerpt,p.tag,(p.body||[]).join(' '),p.titleHi,p.excerptHi,p.tagHi,(p.bodyHi||[]).join(' ')))
+  return <><PageHero tag={t.tag} title={t.title} copy={t.copy} crumbs={['Blog']} aside={<div className="panel-block p-6"><p className="eyebrow !text-ink/60">{t.tag}</p><p className="mt-2 font-display text-6xl font-extrabold text-navy">{resources.length+posts.length}</p><p className="mt-1 font-semibold text-navy">{t.count}</p><p className="mt-4 border-t-2 border-navy/10 pt-4 text-sm text-ink/75">{t.side} <Link to="/learn" className="font-bold text-signal">{t.sideLink}</Link></p></div>}><LangToggle lang={lang} onChange={setLang}/><div className="mt-5"><SearchBar value={q} onChange={setQ} placeholder={t.search}/></div></PageHero><section className="section"><TagFilter tags={topics.map(x=>x==='all'?t.all:x)} active={tag==='all'?t.all:tag} onChange={x=>setTag(x===t.all?'all':x)}/><div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{filtered.length+shownPosts.length?<>{filtered.map(r=><ResourceCard key={r.slug} slug={r.slug} title={r.title} topic={r.topic} time={lang==='hi'?r.time.replace('min','मिनट'):r.time} readLabel={t.read}/>)}{shownPosts.map(p=><ResourceCard key={p.id||p.slug} title={p.title} topic={p.tag} excerpt={p.excerpt} image={p.image} meta={p.date||''} to={`/updates/${p.slug}`}/>)}</>:<EmptyState>{t.empty}</EmptyState>}</div></section></>
 }
 
 function ArticleLayout({crumbs,eyebrow,title,meta,body,back,backLabel,aside,toolbar,notice}){return <><section className="border-b-2 border-navy bg-paper"><Breadcrumb trail={crumbs}/><div className="mx-auto max-w-6xl px-5 pb-12 pt-8 md:px-8">{toolbar&&<div className="mb-6">{toolbar}</div>}<p className="tag">{eyebrow}</p><h1 className="mt-5 max-w-4xl text-4xl leading-[1.05] md:text-6xl">{title}</h1>{meta&&<p className="mt-4 text-sm font-semibold text-ink/65">{meta}</p>}</div></section><div className="section grid gap-12 lg:grid-cols-[1fr_300px]"><article className="max-w-2xl space-y-5 text-lg leading-8 text-ink/85">{notice&&<Note>{notice}</Note>}{body.map((p,i)=><p key={i}>{p}</p>)}<Link to={back} className="btn-primary !mt-10">{backLabel} <ArrowRight size={16}/></Link></article><aside className="space-y-5">{aside}</aside></div></>}
@@ -115,11 +119,8 @@ function OpportunityGrid({page,emptyMessage,lang='en',copy=OPP_EN,onQuery}){
 export function Schemes(){
   const [lang,setLang]=useLang()
   const [q,setQ]=useState('')
-  const [posts,setPosts]=useState(null)
   const t=pageHi.schemes[lang]
-  useEffect(()=>{let alive=true;api.publicPosts().then(d=>{if(alive)setPosts(d)}).catch(()=>{if(alive)setPosts([])});return()=>{alive=false}},[])
-  const stories=(posts||[]).filter(p=>textMatch(q,p.title,p.titleHi,p.excerpt,p.excerptHi,p.tag,p.tagHi,(p.body||[]).join(' '),(p.bodyHi||[]).join(' '))).map(p=>localPost(p,lang))
-  return <><PageHero tag={t.tag} title={t.title} copy={t.copy} crumbs={['Schemes']} aside={<PhotoPanel src="/images/schoolgirls-india.jpg" alt="Indian students on their way to school"/>}><LangToggle lang={lang} onChange={setLang}/></PageHero><section className="section"><div className="mb-10"><Note><b className="text-navy">{t.noteBold}</b> {t.note}</Note></div><OpportunityGrid page="schemes" lang={lang} copy={t} emptyMessage={t.empty} onQuery={setQ}/></section><LiveFeed category="schemes" query={q} title={lang==='hi'?'योजनाओं की ताज़ा ख़बरें (अंग्रेज़ी में)':'Live scheme news'}/>{stories.length>0&&<section className="section pt-0"><SectionHead eyebrow={lang==='hi'?'StreetSmarter से':'From StreetSmarter'} title={lang==='hi'?'कहानियाँ':'Stories'}/><div className="grid gap-5 md:grid-cols-2">{stories.map(p=><Link key={p.slug} to={`/updates/${p.slug}`} className="card block p-6">{p.image&&<img src={resolveImage(p.image)} alt="" className="mb-4 h-40 w-full rounded-md border-2 border-navy object-cover"/>}<p className="eyebrow">{p.tag}{p.date?` · ${p.date}`:''}</p><h3 className="mt-3 text-2xl leading-tight">{p.title}</h3><p className="mt-2 text-sm leading-6 text-ink/75">{p.excerpt}</p></Link>)}</div></section>}<section className="section pt-0"><NewsletterSignup/></section></>
+  return <><PageHero tag={t.tag} title={t.title} copy={t.copy} crumbs={['Schemes']} aside={<PhotoPanel src="/images/schoolgirls-india.jpg" alt="Indian students on their way to school"/>}><LangToggle lang={lang} onChange={setLang}/></PageHero><section className="section"><div className="mb-10"><Note><b className="text-navy">{t.noteBold}</b> {t.note}</Note></div><OpportunityGrid page="schemes" lang={lang} copy={t} emptyMessage={t.empty} onQuery={setQ}/></section><LiveFeed category="schemes" query={q} title={lang==='hi'?'योजनाओं की ताज़ा ख़बरें (अंग्रेज़ी में)':'Live scheme news'}/><section className="section pt-0"><NewsletterSignup/></section></>
 }
 
 export function Contribute(){return <><PageHero tag="Contribute" title="Find a way to pitch in." copy="Train a session, volunteer your skills, or support the work — and explore internships and roles that build real skills" crumbs={['Contribute']} aside={<PhotoPanel src="/images/students-collaborating.jpg" alt="Students collaborating on a project"/>}><a href="#apply" className="btn-accent">Apply now <ArrowRight size={16}/></a></PageHero><section id="apply" className="section scroll-mt-20"><ApplySection/></section><section className="border-t-2 border-navy bg-white"><div className="section"><SectionHead eyebrow="Open roles" title="Internships and roles" copy="Volunteer roles and internships the team has posted"/><OpportunityGrid page="volunteer" emptyMessage="No roles added yet — check back soon"/></div></section></>}
@@ -148,10 +149,10 @@ export function UpdateDetail(){
   const [post,setPost]=useState(null)
   const [notFound,setNotFound]=useState(false)
   useEffect(()=>{let alive=true;api.publicPosts().then(list=>{if(!alive)return;const p=list.find(p=>p.slug===slug);p?setPost(p):setNotFound(true)}).catch(()=>{if(alive)setNotFound(true)});return()=>{alive=false}},[slug])
-  if(notFound)return <NotFound crumbs={['Schemes','Not found']} title="Post not found" copy="That story may have moved or been removed." back="/schemes" backLabel="Back to Schemes"/>
+  if(notFound)return <NotFound crumbs={['Blog','Not found']} title="Post not found" copy="That story may have moved or been removed." back="/blog" backLabel="Back to Blog"/>
   if(!post)return <div className="section"><Loading/></div>
   const view=localPost(post,lang)
-  return <ArticleLayout crumbs={['Schemes',view.title]} toolbar={<LangToggle lang={lang} onChange={setLang}/>} eyebrow={view.tag} title={view.title} meta={post.date} body={view.body} back="/schemes" backLabel={lang==='hi'?'योजनाओं पर वापस':'Back to Schemes'} aside={<QuizAside/>}/>
+  return <ArticleLayout crumbs={['Blog',view.title]} toolbar={<LangToggle lang={lang} onChange={setLang}/>} eyebrow={view.tag} title={view.title} meta={post.date} body={view.body} back="/blog" backLabel={lang==='hi'?'ब्लॉग पर वापस':'Back to Blog'} aside={<QuizAside/>}/>
 }
 
 export function Downloads(){
@@ -210,7 +211,7 @@ export function SearchResults(){
       {lessonResults.length>0&&<div><SectionHead eyebrow="Blog" title="Lessons"/><div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{lessonResults.map(r=><ResourceCard key={r.slug} slug={r.slug} title={r.title} topic={r.topic} time={r.time}/>)}</div></div>}
       {learnResults.length>0&&<div><SectionHead eyebrow="Learn" title="Guides"/><div className="grid gap-5 md:grid-cols-2">{learnResults.map(item=><DownloadCard key={item.file} title={item.title} description={item.description} lang={item.lang} format={item.format} file={item.file}/>)}</div></div>}
       {oppResults.length>0&&<div><SectionHead eyebrow="Schemes & contribute" title="Opportunities"/><div className="grid gap-5 md:grid-cols-3">{oppResults.map(o=><OpportunityCard key={o.id} title={o.title} org={o.org} description={o.description} deadline={o.deadline} kind={o.kind} link={o.link} image={o.image}/>)}</div></div>}
-      {postResults.length>0&&<div><SectionHead eyebrow="Schemes" title="Stories"/>{postResults.map(p=><ArticleCard key={p.slug} slug={p.slug} tag={p.tag} title={p.title} excerpt={p.excerpt} time={p.date} image={p.image}/>)}</div>}
+      {postResults.length>0&&<div><SectionHead eyebrow="Blog" title="Stories"/>{postResults.map(p=><ArticleCard key={p.slug} slug={p.slug} tag={p.tag} title={p.title} excerpt={p.excerpt} time={p.date} image={p.image}/>)}</div>}
       {newsResults.length>0&&<div><SectionHead eyebrow="Schemes" title="From around the web"/><div className="grid gap-5 md:grid-cols-2">{newsResults.map(it=><a key={it.id} href={it.link} target="_blank" rel="noopener noreferrer" className="card p-6"><p className="eyebrow flex items-center gap-1.5"><Radio size={12}/> {it.sourceLabel}</p><h3 className="mt-3 text-xl leading-snug">{it.title}</h3><p className="mt-2 text-sm leading-6 text-ink/75">{it.summary}</p></a>)}</div></div>}
       {eventResults.length>0&&<div><SectionHead eyebrow="Events" title="Sessions"/><div className="grid gap-5 md:grid-cols-2">{eventResults.map(e=><EventCard key={e.id} date={formatEventDate(e.date)} title={e.title} place={e.place} type={e.type} image={e.image}/>)}</div></div>}
       {faqResults.length>0&&<div><SectionHead eyebrow="FAQ" title="Questions"/><FAQAccordion items={faqResults}/></div>}
@@ -315,7 +316,7 @@ export function Admin(){
 
   {active==='posts'&&<div className="mt-8 space-y-6">
     <form onSubmit={e=>{e.preventDefault();act(async()=>{await api.addPost(newPost);setNewPost({tag:'',title:'',excerpt:'',body:'',tagHi:'',titleHi:'',excerptHi:'',bodyHi:'',date:new Date().toISOString().slice(0,10),featured:false,image:''})})}} className="grid gap-3 panel p-6">
-      <p className="text-sm text-ink/60">Hindi is optional. If you leave it blank, the Hindi view of Updates shows the English text.</p>
+      <p className="text-sm text-ink/60">Published posts appear on the Blog page, in the same list as the lessons. Hindi is optional. If you leave it blank, the Hindi view of the Blog shows the English text.</p>
       <div className="grid gap-3 sm:grid-cols-2">
         <input required value={newPost.tag} onChange={e=>setNewPost({...newPost,tag:e.target.value})} className="input" placeholder="Tag (e.g. SESSION RECAP)"/>
         <input required type="date" value={newPost.date} onChange={e=>setNewPost({...newPost,date:e.target.value})} className="input"/>
@@ -329,10 +330,10 @@ export function Admin(){
       <textarea value={newPost.excerptHi} onChange={e=>setNewPost({...newPost,excerptHi:e.target.value})} className="input" placeholder="एक पंक्ति का सार (Hindi excerpt)"/>
       <textarea value={newPost.bodyHi} onChange={e=>setNewPost({...newPost,bodyHi:e.target.value})} className="input min-h-40" placeholder="पूरा लेख — पैराग्राफ के बीच एक खाली लाइन"/>
       <ImageField value={newPost.image} onChange={url=>setNewPost({...newPost,image:url})}/>
-      <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={newPost.featured} onChange={e=>setNewPost({...newPost,featured:e.target.checked})}/> Feature this post at the top of Updates</label>
+      <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={newPost.featured} onChange={e=>setNewPost({...newPost,featured:e.target.checked})}/> Mark as featured</label>
       <button type="submit" className="btn-primary">Publish post</button>
     </form>
-    <div className="panel divide-y-2 divide-navy/10">{posts.length?posts.map(p=><div key={p.id} className="flex flex-wrap items-center justify-between gap-3 p-4"><div className="min-w-0">{p.image&&<ImageCell src={p.image} onRemove={()=>act(()=>api.updatePost(p.id,{image:''}))}/>}<p className="font-bold">{p.title}{p.featured&&<span className="ml-2 chip bg-saffron text-[10px] text-navy">FEATURED</span>}{p.titleHi&&<span className="ml-2 chip bg-paper text-[10px] text-navy">हिंदी</span>}</p><p className="truncate text-xs text-ink/50">{p.tag} · {p.date}</p><PostHindiEditor item={p} busy={busy} onSave={data=>act(()=>api.updatePost(p.id,data))}/></div><button type="button" disabled={busy} onClick={()=>act(()=>api.deletePost(p.id))} className="chip border-coral bg-coral/10 text-coral">Remove</button></div>):<p className="p-6 text-ink/50">No posts yet — write one above. Nothing shows on Updates until you do.</p>}</div>
+    <div className="panel divide-y-2 divide-navy/10">{posts.length?posts.map(p=><div key={p.id} className="flex flex-wrap items-center justify-between gap-3 p-4"><div className="min-w-0">{p.image&&<ImageCell src={p.image} onRemove={()=>act(()=>api.updatePost(p.id,{image:''}))}/>}<p className="font-bold">{p.title}{p.featured&&<span className="ml-2 chip bg-saffron text-[10px] text-navy">FEATURED</span>}{p.titleHi&&<span className="ml-2 chip bg-paper text-[10px] text-navy">हिंदी</span>}</p><p className="truncate text-xs text-ink/50">{p.tag} · {p.date}</p><PostHindiEditor item={p} busy={busy} onSave={data=>act(()=>api.updatePost(p.id,data))}/></div><button type="button" disabled={busy} onClick={()=>act(()=>api.deletePost(p.id))} className="chip border-coral bg-coral/10 text-coral">Remove</button></div>):<p className="p-6 text-ink/50">No posts yet — write one above. Nothing extra shows on the Blog until you do.</p>}</div>
   </div>}
 
 
