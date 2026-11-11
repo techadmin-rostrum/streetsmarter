@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useParams, useSearchParams, useLocation } from 'react-router-dom'
 import { ArrowRight, CheckCircle2, RotateCcw, RefreshCw, Radio, Mail } from 'lucide-react'
 import { ResourceCard, ArticleCard, EventCard, OpportunityCard, DownloadCard } from '../components/cards/Cards'
@@ -12,8 +12,8 @@ import { ImpactView } from '../components/impact/ImpactView'
 import { ApplySection } from '../components/apply/ApplySection'
 export { ImpactView as Impact }
 import { Breadcrumb, InstagramIcon } from '../components/layout/Shell'
-import { api } from '../lib/api'
-import { resources, faqs, downloadGroups, quizQuestions, pillarSlug, learnCopy } from '../data/content'
+import { api, resolveImage } from '../lib/api'
+import { resources, faqs, downloadGroups, quizQuestions, pillarSlug, learnCopy, builtinSchemes } from '../data/content'
 
 function LiveFeed({category,title,items:given,flush=true,query=''}){
   const owned=given===undefined
@@ -98,7 +98,7 @@ function OpportunityGrid({page,emptyMessage,lang='en',copy=OPP_EN,onQuery}){
   const [all,setAll]=useState(null)
   const [tag,setTag]=useState('all')
   const [q,setQ]=useState('')
-  useEffect(()=>{let alive=true;api.publicOpportunities(page).then(d=>{if(alive)setAll(d)}).catch(()=>{if(alive)setAll([])});return()=>{alive=false}},[page])
+  useEffect(()=>{let alive=true;const fallback=page==='schemes'?builtinSchemes:[];api.publicOpportunities(page).then(d=>{if(alive)setAll(d.length?d:fallback)}).catch(()=>{if(alive)setAll(fallback)});return()=>{alive=false}},[page])
   useEffect(()=>setTag('all'),[lang])
   function change(value){setQ(value);onQuery&&onQuery(value)}
   if(all===null)return <Loading/>
@@ -115,8 +115,11 @@ function OpportunityGrid({page,emptyMessage,lang='en',copy=OPP_EN,onQuery}){
 export function Schemes(){
   const [lang,setLang]=useLang()
   const [q,setQ]=useState('')
+  const [posts,setPosts]=useState(null)
   const t=pageHi.schemes[lang]
-  return <><PageHero tag={t.tag} title={t.title} copy={t.copy} crumbs={['Schemes']} aside={<PhotoPanel src="/images/schoolgirls-india.jpg" alt="Indian students on their way to school"/>}><div className="flex flex-wrap items-center gap-4"><LangToggle lang={lang} onChange={setLang}/><Link to="/learn#know-your-schemes" className="btn-outline">{t.guides} <ArrowRight size={16}/></Link></div></PageHero><section className="section"><div className="mb-10"><Note><b className="text-navy">{t.noteBold}</b> {t.note}</Note></div><OpportunityGrid page="schemes" lang={lang} copy={t} emptyMessage={t.empty} onQuery={setQ}/></section><LiveFeed category="schemes" query={q} title={lang==='hi'?'योजनाओं की ताज़ा ख़बरें (अंग्रेज़ी में)':'Live scheme news'}/></>
+  useEffect(()=>{let alive=true;api.publicPosts().then(d=>{if(alive)setPosts(d)}).catch(()=>{if(alive)setPosts([])});return()=>{alive=false}},[])
+  const stories=(posts||[]).filter(p=>textMatch(q,p.title,p.titleHi,p.excerpt,p.excerptHi,p.tag,p.tagHi,(p.body||[]).join(' '),(p.bodyHi||[]).join(' '))).map(p=>localPost(p,lang))
+  return <><PageHero tag={t.tag} title={t.title} copy={t.copy} crumbs={['Schemes']} aside={<PhotoPanel src="/images/schoolgirls-india.jpg" alt="Indian students on their way to school"/>}><LangToggle lang={lang} onChange={setLang}/></PageHero><section className="section"><div className="mb-10"><Note><b className="text-navy">{t.noteBold}</b> {t.note}</Note></div><OpportunityGrid page="schemes" lang={lang} copy={t} emptyMessage={t.empty} onQuery={setQ}/></section><LiveFeed category="schemes" query={q} title={lang==='hi'?'योजनाओं की ताज़ा ख़बरें (अंग्रेज़ी में)':'Live scheme news'}/>{stories.length>0&&<section className="section pt-0"><SectionHead eyebrow={lang==='hi'?'StreetSmarter से':'From StreetSmarter'} title={lang==='hi'?'कहानियाँ':'Stories'}/><div className="grid gap-5 md:grid-cols-2">{stories.map(p=><Link key={p.slug} to={`/updates/${p.slug}`} className="card block p-6">{p.image&&<img src={resolveImage(p.image)} alt="" className="mb-4 h-40 w-full rounded-md border-2 border-navy object-cover"/>}<p className="eyebrow">{p.tag}{p.date?` · ${p.date}`:''}</p><h3 className="mt-3 text-2xl leading-tight">{p.title}</h3><p className="mt-2 text-sm leading-6 text-ink/75">{p.excerpt}</p></Link>)}</div></section>}<section className="section pt-0"><NewsletterSignup/></section></>
 }
 
 export function Contribute(){return <><PageHero tag="Contribute" title="Find a way to pitch in." copy="Train a session, volunteer your skills, or support the work — and explore internships and roles that build real skills" crumbs={['Contribute']} aside={<PhotoPanel src="/images/students-collaborating.jpg" alt="Students collaborating on a project"/>}><a href="#apply" className="btn-accent">Apply now <ArrowRight size={16}/></a></PageHero><section id="apply" className="section scroll-mt-20"><ApplySection/></section><section className="border-t-2 border-navy bg-white"><div className="section"><SectionHead eyebrow="Open roles" title="Internships and roles" copy="Volunteer roles and internships the team has posted"/><OpportunityGrid page="volunteer" emptyMessage="No roles added yet — check back soon"/></div></section></>}
@@ -139,42 +142,16 @@ export function Events(){
   </section><section className="bg-navy text-white"><div className="mx-auto flex max-w-6xl flex-col gap-6 px-5 py-14 md:flex-row md:items-center md:justify-between md:px-8"><div><h2 className="max-w-xl text-4xl leading-[1.05] md:text-5xl">Want StreetSmarter at your school or colony?</h2><p className="mt-4 text-white/75">We run free sessions for schools, colleges and community groups anywhere in India</p></div><Link to="/contact?topic=Booking" className="btn-accent shrink-0 self-start md:self-auto">Book a session <ArrowRight size={16}/></Link></div></section></>
 }
 
-export function Updates(){
-  const [lang,setLang]=useLang()
-  const [posts,setPosts]=useState(null)
-  const [live,setLive]=useState(null)
-  const [tag,setTag]=useState('Latest')
-  const [q,setQ]=useState('')
-  useEffect(()=>{let alive=true;api.publicPosts().then(d=>{if(alive)setPosts(d)}).catch(()=>{if(alive)setPosts([])});api.publicItems('updates').then(d=>{if(alive)setLive(d)}).catch(()=>{if(alive)setLive([])});return()=>{alive=false}},[])
-  const tags=useMemo(()=>['Latest',...Array.from(new Set((posts||[]).map(p=>localPost(p,lang).tag)))],[posts,lang])
-  const activeTag=tags.includes(tag)?tag:'Latest'
-  const featured=posts&&posts.length?(posts.find(p=>p.featured)||posts[0]):null
-  const lead=featured&&localPost(featured,lang)
-  const rest=posts&&featured?posts.filter(p=>p.id!==featured.id):[]
-  const postMatch=p=>textMatch(q,p.title,p.titleHi,p.excerpt,p.excerptHi,p.tag,p.tagHi,(p.body||[]).join(' '),(p.bodyHi||[]).join(' '))
-  const featuredMatch=featured&&postMatch(featured)
-  const filtered=rest.filter(p=>{const view=localPost(p,lang);return (activeTag==='Latest'||view.tag===activeTag)&&postMatch(p)}).map(p=>localPost(p,lang))
-  const liveShown=(live||[]).filter(it=>textMatch(q,it.title,it.summary,it.sourceLabel))
-  const ready=posts!==null&&live!==null
-  const nothing=ready&&posts.length===0&&live.length===0
-  const noMatches=ready&&q.trim()&&!featuredMatch&&filtered.length===0&&liveShown.length===0&&!nothing
-  return <><PageHero tag="The Citizen Edit · Weekly civic digest" title="Public life, made legible." copy="The stories, systems and small signals shaping India — explained clearly for young citizens" crumbs={['Updates']}><div className="flex flex-col gap-5"><LangToggle lang={lang} onChange={setLang}/><SearchBar value={q} onChange={setQ} placeholder={lang==='hi'?'अपडेट खोजें':'Search updates'}/></div></PageHero>
-  {(!ready||nothing||(posts.length>0&&(!q.trim()||featuredMatch)))&&<section className="section pb-8">{!ready?<Loading/>:nothing?<EmptyState>No updates published yet — check back soon</EmptyState>:<><TagFilter tags={tags} active={activeTag} onChange={setTag}/><div className="mt-8 grid gap-6 lg:grid-cols-[1.35fr_.8fr]"><article className="panel-block p-7 md:p-10"><p className="eyebrow">{lead.tag} · {lead.date}</p><h2 className="mt-4 max-w-2xl text-4xl leading-tight md:text-5xl">{lead.title}</h2><p className="mt-5 max-w-xl leading-7 text-ink/80">{lead.excerpt}</p><div className="mt-8 border-t-2 border-navy/10 pt-5"><Link to={`/updates/${lead.slug}`} className="btn-primary">{lang==='hi'?'कहानी पढ़ें':'Read story'} <ArrowRight size={16}/></Link></div></article><aside className="panel bg-saffron p-7"><p className="text-xs font-bold uppercase tracking-[.14em] text-navy">Why this matters</p><h3 className="mt-5 text-3xl">Your decisions live beyond election day</h3><p className="mt-4 leading-7 text-navy">Knowing how a representative is chosen helps you ask better questions of the people who make decisions in your name</p></aside></div></>}</section>}
-  {filtered.length>0&&<section className="section grid gap-10 pt-0 lg:grid-cols-[1.2fr_.8fr]"><div><SectionHead eyebrow="Latest dispatches" title="In the conversation"/>{filtered.map(p=><ArticleCard key={p.slug} slug={p.slug} tag={p.tag} title={p.title} excerpt={p.excerpt} time={p.date} image={p.image}/>)}</div><aside><div className="panel p-6"><p className="eyebrow">Trending civic topics</p><div className="mt-5 flex flex-wrap gap-2">{['Voter registration','Public spaces','Digital rights','Climate action','Education policy'].map(x=><span key={x} className="chip bg-paper text-navy">#{x}</span>)}</div></div></aside></section>}
-  {noMatches&&<section className="section pt-0"><p className="text-ink/60">No matches yet</p></section>}
-  <LiveFeed title="Live from around the web" items={ready?liveShown:[]} flush={!!(posts&&posts.length>0)}/><section className="section pt-0"><NewsletterSignup/></section></>
-}
-
 export function UpdateDetail(){
   const {slug}=useParams()
   const [lang,setLang]=useLang()
   const [post,setPost]=useState(null)
   const [notFound,setNotFound]=useState(false)
   useEffect(()=>{let alive=true;api.publicPosts().then(list=>{if(!alive)return;const p=list.find(p=>p.slug===slug);p?setPost(p):setNotFound(true)}).catch(()=>{if(alive)setNotFound(true)});return()=>{alive=false}},[slug])
-  if(notFound)return <NotFound crumbs={['Updates','Not found']} title="Post not found" copy="That update may have moved or been removed." back="/updates" backLabel="Back to Updates"/>
+  if(notFound)return <NotFound crumbs={['Schemes','Not found']} title="Post not found" copy="That story may have moved or been removed." back="/schemes" backLabel="Back to Schemes"/>
   if(!post)return <div className="section"><Loading/></div>
   const view=localPost(post,lang)
-  return <ArticleLayout crumbs={['Updates',view.title]} toolbar={<LangToggle lang={lang} onChange={setLang}/>} eyebrow={view.tag} title={view.title} meta={post.date} body={view.body} back="/updates" backLabel={lang==='hi'?'अपडेट पर वापस':'Back to Updates'} aside={<QuizAside/>}/>
+  return <ArticleLayout crumbs={['Schemes',view.title]} toolbar={<LangToggle lang={lang} onChange={setLang}/>} eyebrow={view.tag} title={view.title} meta={post.date} body={view.body} back="/schemes" backLabel={lang==='hi'?'योजनाओं पर वापस':'Back to Schemes'} aside={<QuizAside/>}/>
 }
 
 export function Downloads(){
@@ -228,13 +205,13 @@ export function SearchResults(){
   const total=lessonResults.length+learnResults.length+postResults.length+oppResults.length+eventResults.length+newsResults.length+faqResults.length
   return <><PageHero tag="Search StreetSmarter" title="Find your way around civic life." copy="Search lessons, guides, schemes, updates and events — all focused on Indian rights, institutions and public life" crumbs={['Search']}><SearchBar value={q} onChange={setQ} placeholder="Try 'voter ID', 'scholarship', 'RTI', 'online safety'..."/></PageHero>
   <section className="section">
-    {!query?<p className="text-ink/60">Start typing to search across Blog, Learn, Schemes, Contribute, Updates and Events</p>:total===0?<EmptyState>No results for "{q}" — try a different word</EmptyState>:<div className="space-y-14">
+    {!query?<p className="text-ink/60">Start typing to search across Blog, Learn, Schemes, Contribute and Events</p>:total===0?<EmptyState>No results for "{q}" — try a different word</EmptyState>:<div className="space-y-14">
       <p className="font-semibold text-navy">{total} result{total===1?'':'s'} for "{query}"</p>
       {lessonResults.length>0&&<div><SectionHead eyebrow="Blog" title="Lessons"/><div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{lessonResults.map(r=><ResourceCard key={r.slug} slug={r.slug} title={r.title} topic={r.topic} time={r.time}/>)}</div></div>}
       {learnResults.length>0&&<div><SectionHead eyebrow="Learn" title="Guides"/><div className="grid gap-5 md:grid-cols-2">{learnResults.map(item=><DownloadCard key={item.file} title={item.title} description={item.description} lang={item.lang} format={item.format} file={item.file}/>)}</div></div>}
       {oppResults.length>0&&<div><SectionHead eyebrow="Schemes & contribute" title="Opportunities"/><div className="grid gap-5 md:grid-cols-3">{oppResults.map(o=><OpportunityCard key={o.id} title={o.title} org={o.org} description={o.description} deadline={o.deadline} kind={o.kind} link={o.link} image={o.image}/>)}</div></div>}
-      {postResults.length>0&&<div><SectionHead eyebrow="Updates" title="Posts"/>{postResults.map(p=><ArticleCard key={p.slug} slug={p.slug} tag={p.tag} title={p.title} excerpt={p.excerpt} time={p.date} image={p.image}/>)}</div>}
-      {newsResults.length>0&&<div><SectionHead eyebrow="Updates" title="From around the web"/><div className="grid gap-5 md:grid-cols-2">{newsResults.map(it=><a key={it.id} href={it.link} target="_blank" rel="noopener noreferrer" className="card p-6"><p className="eyebrow flex items-center gap-1.5"><Radio size={12}/> {it.sourceLabel}</p><h3 className="mt-3 text-xl leading-snug">{it.title}</h3><p className="mt-2 text-sm leading-6 text-ink/75">{it.summary}</p></a>)}</div></div>}
+      {postResults.length>0&&<div><SectionHead eyebrow="Schemes" title="Stories"/>{postResults.map(p=><ArticleCard key={p.slug} slug={p.slug} tag={p.tag} title={p.title} excerpt={p.excerpt} time={p.date} image={p.image}/>)}</div>}
+      {newsResults.length>0&&<div><SectionHead eyebrow="Schemes" title="From around the web"/><div className="grid gap-5 md:grid-cols-2">{newsResults.map(it=><a key={it.id} href={it.link} target="_blank" rel="noopener noreferrer" className="card p-6"><p className="eyebrow flex items-center gap-1.5"><Radio size={12}/> {it.sourceLabel}</p><h3 className="mt-3 text-xl leading-snug">{it.title}</h3><p className="mt-2 text-sm leading-6 text-ink/75">{it.summary}</p></a>)}</div></div>}
       {eventResults.length>0&&<div><SectionHead eyebrow="Events" title="Sessions"/><div className="grid gap-5 md:grid-cols-2">{eventResults.map(e=><EventCard key={e.id} date={formatEventDate(e.date)} title={e.title} place={e.place} type={e.type} image={e.image}/>)}</div></div>}
       {faqResults.length>0&&<div><SectionHead eyebrow="FAQ" title="Questions"/><FAQAccordion items={faqResults}/></div>}
     </div>}
