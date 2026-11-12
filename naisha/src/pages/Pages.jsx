@@ -7,12 +7,12 @@ import { useLang, useLessonOverrides, localiseLesson } from '../lib/lang'
 import { lessonsHi, pageHi } from '../data/lessonsHi'
 import { HeroSection, HomeSections, PillarGrid } from '../components/home/HomeSections'
 import { NewsletterSignup } from '../components/newsletter/NewsletterSignup'
-import { AdminSidebar, ItemRow, ImageField, ImageCell, ImpactEditor, SettingsEditor, ApplicationsList, OppHindiEditor, PostHindiEditor, LessonTranslations } from '../components/admin/AdminParts'
+import { AdminSidebar, ItemRow, ImageField, ImageListField, ImageCell, ImpactEditor, SettingsEditor, ApplicationsList, OppHindiEditor, PostHindiEditor, LessonTranslations } from '../components/admin/AdminParts'
 import { ImpactView } from '../components/impact/ImpactView'
 import { ApplySection } from '../components/apply/ApplySection'
 export { ImpactView as Impact }
 import { Breadcrumb, InstagramIcon } from '../components/layout/Shell'
-import { api } from '../lib/api'
+import { api, resolveImage } from '../lib/api'
 import { resources, faqs, downloadGroups, quizQuestions, pillarSlug, learnCopy, builtinSchemes } from '../data/content'
 
 function LiveFeed({category,title,items:given,flush=true,query=''}){
@@ -25,7 +25,7 @@ function LiveFeed({category,title,items:given,flush=true,query=''}){
   return <section className={flush?'section pt-0':'section'}><SectionHead eyebrow="Updated automatically" title={title}/><div className="grid gap-5 md:grid-cols-2">{visible.map(it=><a key={it.id} href={it.link} target="_blank" rel="noopener noreferrer" className="card p-6"><p className="eyebrow flex items-center gap-1.5"><Radio size={12}/> {it.sourceLabel}</p><h3 className="mt-3 text-xl leading-snug">{it.title}</h3><p className="mt-2 text-sm leading-6 text-ink/75">{it.summary}</p></a>)}</div></section>
 }
 
-function formatEventDate(iso){try{return new Date(iso+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'}).toUpperCase()}catch{return iso}}
+function formatEventDate(iso){if(!iso)return '';try{const d=new Date(iso+'T00:00:00');if(Number.isNaN(d.getTime()))return '';return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'}).toUpperCase()}catch{return ''}}
 
 function localPost(post, lang){
   if(!post||lang!=='hi')return post
@@ -138,8 +138,8 @@ export function Events(){
   const pastShown=past.filter(match)
   const hasEvents=upcoming.length+past.length>0
   return <><PageHero tag="Events & workshops" title="Learn in the room." copy="Free, youth-friendly sessions where questions are welcome and participation has a practical next step" crumbs={['Events']} aside={<PhotoPanel src="/images/teens-outdoors.jpg" alt="Teenagers together outdoors"/>}>{hasEvents&&<SearchBar value={q} onChange={setQ} placeholder="Search events"/>}</PageHero><section className="section"><SectionHead eyebrow="Coming up" title="Upcoming sessions"/>
-    {data===null?<Loading/>:!hasEvents?<EmptyState>No events scheduled right now — check back soon, or ask us to bring a session to you below</EmptyState>:<>{upcoming.length>0&&<TagFilter tags={types} active={tag} onChange={setTag}/>}{filtered.length>0&&<div className="mt-8 grid gap-5 md:grid-cols-2">{filtered.map(e=><EventCard key={e.id} date={formatEventDate(e.date)} title={e.title} place={e.place} type={e.type} image={e.image}/>)}</div>}{filtered.length===0&&pastShown.length===0&&<p className="text-ink/60">No matches yet</p>}{filtered.length===0&&pastShown.length>0&&!q.trim()&&<EmptyState>No events scheduled right now — check back soon, or ask us to bring a session to you below</EmptyState>}</>}
-    {pastShown.length>0&&<div className="mt-16"><SectionHead eyebrow="Already happened" title="Past events"/><div className="grid gap-5 md:grid-cols-2">{pastShown.map(e=><EventCard key={e.id} date={formatEventDate(e.date)} title={e.title} place={e.place} type={e.type} image={e.image} past/>)}</div></div>}
+    {data===null?<Loading/>:!hasEvents?<EmptyState>No events scheduled right now — check back soon, or ask us to bring a session to you below</EmptyState>:<>{upcoming.length>0&&<TagFilter tags={types} active={tag} onChange={setTag}/>}{filtered.length>0&&<div className="mt-8 grid gap-5 md:grid-cols-2">{filtered.map(e=><EventCard key={e.id} date={formatEventDate(e.date)} title={e.title} place={e.place} type={e.type} image={e.image} images={e.images} description={e.description} link={e.link}/>)}</div>}{filtered.length===0&&pastShown.length===0&&<p className="text-ink/60">No matches yet</p>}{filtered.length===0&&pastShown.length>0&&!q.trim()&&<EmptyState>No events scheduled right now — check back soon, or ask us to bring a session to you below</EmptyState>}</>}
+    {pastShown.length>0&&<div className="mt-16"><SectionHead eyebrow="Already happened" title="Past events"/><div className="grid gap-5 md:grid-cols-2">{pastShown.map(e=><EventCard key={e.id} date={formatEventDate(e.date)} title={e.title} place={e.place} type={e.type} image={e.image} images={e.images} description={e.description} link={e.link} past/>)}</div></div>}
   </section><section className="bg-navy text-white"><div className="mx-auto flex max-w-6xl flex-col gap-6 px-5 py-14 md:flex-row md:items-center md:justify-between md:px-8"><div><h2 className="max-w-xl text-4xl leading-[1.05] md:text-5xl">Want StreetSmarter at your school or colony?</h2><p className="mt-4 text-white/75">We run free sessions for schools, colleges and community groups anywhere in India</p></div><Link to="/contact?topic=Booking" className="btn-accent shrink-0 self-start md:self-auto">Book a session <ArrowRight size={16}/></Link></div></section></>
 }
 
@@ -213,7 +213,7 @@ export function SearchResults(){
       {oppResults.length>0&&<div><SectionHead eyebrow="Schemes & contribute" title="Opportunities"/><div className="grid gap-5 md:grid-cols-3">{oppResults.map(o=><OpportunityCard key={o.id} title={o.title} org={o.org} description={o.description} deadline={o.deadline} kind={o.kind} link={o.link} image={o.image}/>)}</div></div>}
       {postResults.length>0&&<div><SectionHead eyebrow="Blog" title="Stories"/>{postResults.map(p=><ArticleCard key={p.slug} slug={p.slug} tag={p.tag} title={p.title} excerpt={p.excerpt} time={p.date} image={p.image}/>)}</div>}
       {newsResults.length>0&&<div><SectionHead eyebrow="Schemes" title="From around the web"/><div className="grid gap-5 md:grid-cols-2">{newsResults.map(it=><a key={it.id} href={it.link} target="_blank" rel="noopener noreferrer" className="card p-6"><p className="eyebrow flex items-center gap-1.5"><Radio size={12}/> {it.sourceLabel}</p><h3 className="mt-3 text-xl leading-snug">{it.title}</h3><p className="mt-2 text-sm leading-6 text-ink/75">{it.summary}</p></a>)}</div></div>}
-      {eventResults.length>0&&<div><SectionHead eyebrow="Events" title="Sessions"/><div className="grid gap-5 md:grid-cols-2">{eventResults.map(e=><EventCard key={e.id} date={formatEventDate(e.date)} title={e.title} place={e.place} type={e.type} image={e.image}/>)}</div></div>}
+      {eventResults.length>0&&<div><SectionHead eyebrow="Events" title="Sessions"/><div className="grid gap-5 md:grid-cols-2">{eventResults.map(e=><EventCard key={e.id} date={formatEventDate(e.date)} title={e.title} place={e.place} type={e.type} image={e.image} images={e.images} description={e.description} link={e.link}/>)}</div></div>}
       {faqResults.length>0&&<div><SectionHead eyebrow="FAQ" title="Questions"/><FAQAccordion items={faqResults}/></div>}
     </div>}
   </section></>
@@ -255,6 +255,24 @@ export function Quiz(){
   return <><PageHero tag="Test yourself" title="Take the Quiz." copy="Ten harder questions on your rights, government schemes, money matters and staying safe" crumbs={['Quiz']}/><section className="section max-w-3xl"><div className="mb-6 h-3 overflow-hidden rounded-full border-2 border-navy bg-white"><div className="h-full bg-saffron transition-all" style={{width:`${progress}%`}}/></div>{done?<div className="panel-block p-8 text-center md:p-12"><p className="eyebrow">Your score</p><p className="mt-3 font-display text-7xl font-extrabold text-navy">{score}/{quizQuestions.length}</p><p className="mt-4 text-ink/80">{score===quizQuestions.length?'Perfect — you know your stuff.':score>=quizQuestions.length/2?'Solid start. A few gaps worth closing.':'This is exactly why StreetSmarter exists — head to Learn to close the gaps.'}</p><div className="mt-7 flex flex-wrap justify-center gap-3"><button onClick={restart} className="btn-primary"><RotateCcw size={16}/> Try again</button><Link to="/learn" className="btn-accent">Explore the guides</Link></div></div>:<div className="panel-block p-6 md:p-10"><p className="eyebrow">Question {i+1} of {quizQuestions.length}</p><h2 className="mt-3 text-2xl leading-snug md:text-3xl">{q.q}</h2><div className="mt-7 grid gap-3">{q.options.map((opt,idx)=>{const isCorrect=picked!==null&&idx===q.correct;const isWrongPick=picked===idx&&idx!==q.correct;return <button key={opt} onClick={()=>choose(idx)} className={`flex items-center gap-3 rounded-md border-2 p-4 text-left font-bold transition ${isCorrect?'border-civic bg-civic/10 text-navy':isWrongPick?'border-coral bg-coral/10 text-navy':'border-navy bg-white text-navy hover:bg-paper'}`}><span className="grid h-7 w-7 shrink-0 place-items-center rounded border-2 border-current text-xs">{String.fromCharCode(65+idx)}</span>{opt}</button>})}</div>{picked!==null&&<div className="mt-6"><div className="rounded-md border-2 border-navy bg-saffron/25 p-5"><p className="font-bold text-navy">{picked===q.correct?'Correct':'Not quite'}</p><p className="mt-1 text-sm leading-6 text-ink/85">{q.explain}</p></div><button onClick={next} className="btn-primary mt-5">{i+1<quizQuestions.length?'Next question':'See results'} <ArrowRight size={16}/></button></div>}</div>}</section></>
 }
 
+function EventFields({value,onChange,requireDate}){
+  const set=patch=>onChange({...value,...patch})
+  return <>
+    <div className="grid gap-3 lg:grid-cols-[1.4fr_12rem_1fr_11rem]">
+      <input required value={value.title} onChange={e=>set({title:e.target.value})} className="input" placeholder="Event title"/>
+      <input required={requireDate} type="date" value={value.date} onChange={e=>set({date:e.target.value})} className="input"/>
+      <input required value={value.place} onChange={e=>set({place:e.target.value})} className="input" placeholder="Location"/>
+      <Select value={value.type} onChange={type=>set({type})} options={['Workshop','Conversation','Field session','Online','In person']} />
+    </div>
+    <div className="grid gap-3 sm:grid-cols-2">
+      <Select value={value.status} onChange={status=>set({status})} options={[{value:'upcoming',label:'Upcoming'},{value:'past',label:'Past'}]} />
+      <input value={value.link} onChange={e=>set({link:e.target.value})} className="input" placeholder="YouTube or other link (https://...)"/>
+    </div>
+    <textarea value={value.description} onChange={e=>set({description:e.target.value})} className="input min-h-28" placeholder="Description — what happened, who came, and anything people should know"/>
+    <ImageListField images={value.images} onChange={images=>set({images})}/>
+  </>
+}
+
 export function Admin(){
   const [authed,setAuthed]=useState(null)
   const [password,setPassword]=useState('')
@@ -267,7 +285,10 @@ export function Admin(){
   const [posts,setPosts]=useState([])
   const [counts,setCounts]=useState({})
   const [newSource,setNewSource]=useState({label:'',url:'',category:'updates'})
-  const [newEvent,setNewEvent]=useState({title:'',date:'',place:'',type:'Workshop',image:''})
+  const blankEvent={title:'',date:'',place:'',type:'Workshop',description:'',status:'upcoming',link:'',images:[]}
+  const [newEvent,setNewEvent]=useState(blankEvent)
+  const [editingId,setEditingId]=useState(null)
+  const [eventDraft,setEventDraft]=useState(null)
   const [newOpp,setNewOpp]=useState({page:'schemes',title:'',org:'',link:'',description:'',deadline:'',kind:'Scholarship',image:'',titleHi:'',descriptionHi:'',deadlineHi:'',kindHi:''})
   const [newPost,setNewPost]=useState({tag:'',title:'',excerpt:'',body:'',tagHi:'',titleHi:'',excerptHi:'',bodyHi:'',date:new Date().toISOString().slice(0,10),featured:false,image:''})
   const [busy,setBusy]=useState(false)
@@ -338,17 +359,32 @@ export function Admin(){
 
 
   {active==='events'&&<div className="mt-8 space-y-6">
-    <form onSubmit={e=>{e.preventDefault();act(async()=>{await api.addEvent(newEvent);setNewEvent({title:'',date:'',place:'',type:'Workshop',image:''})})}} className="grid gap-3 panel p-6">
-      <div className="grid gap-3 lg:grid-cols-[1.4fr_9rem_1fr_9rem]">
-        <input required value={newEvent.title} onChange={e=>setNewEvent({...newEvent,title:e.target.value})} className="input" placeholder="Event title"/>
-        <input required type="date" value={newEvent.date} onChange={e=>setNewEvent({...newEvent,date:e.target.value})} className="input"/>
-        <input required value={newEvent.place} onChange={e=>setNewEvent({...newEvent,place:e.target.value})} className="input" placeholder="Place (e.g. Online + Bengaluru)"/>
-        <Select value={newEvent.type} onChange={type=>setNewEvent({...newEvent,type})} options={['Workshop','Conversation','Field session','Online','In person']} />
-      </div>
-      <ImageField value={newEvent.image} onChange={url=>setNewEvent({...newEvent,image:url})}/>
+    <form onSubmit={e=>{e.preventDefault();act(async()=>{await api.addEvent(newEvent);setNewEvent(blankEvent)})}} className="grid gap-3 panel p-6">
+      <EventFields value={newEvent} onChange={setNewEvent} requireDate/>
       <button type="submit" className="btn-primary w-fit">Add event</button>
     </form>
-    <div className="panel divide-y-2 divide-navy/10">{events.length?events.map(ev=><div key={ev.id} className="flex flex-wrap items-center justify-between gap-3 p-4"><div className="min-w-0">{ev.image&&<ImageCell src={ev.image} onRemove={()=>act(()=>api.updateEvent(ev.id,{image:''}))}/>}<p className="font-bold">{ev.title}</p><p className="truncate text-xs text-ink/50">{ev.date} · {ev.place} · {ev.type}</p></div><button type="button" disabled={busy} onClick={()=>act(()=>api.deleteEvent(ev.id))} className="chip border-coral bg-coral/10 text-coral">Remove</button></div>):<p className="p-6 text-ink/50">No events yet — add one above. Nothing shows on the public site until you do.</p>}</div>
+    <div className="panel divide-y-2 divide-navy/10">{events.length?events.map(ev=>{
+      const editing=editingId===ev.id&&eventDraft
+      const pics=ev.images?.length?ev.images:(ev.image?[ev.image]:[])
+      return <div key={ev.id} className="p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            {!editing&&pics.map(src=><img key={src} src={resolveImage(src)} alt="" className="mb-2 mr-2 inline-block h-12 w-12 rounded-md border-2 border-navy object-cover"/>)}
+            <p className="font-bold">{ev.title}</p>
+            <p className="text-xs text-ink/50">{[ev.date,ev.place,ev.type,ev.status||'upcoming'].filter(Boolean).join(' · ')}</p>
+            {!editing&&ev.description&&<p className="mt-1 whitespace-pre-line text-sm leading-6 text-ink/70">{ev.description}</p>}
+          </div>
+          <div className="flex gap-2">
+            <button type="button" disabled={busy} onClick={()=>{if(editing){setEditingId(null);setEventDraft(null)}else{setEditingId(ev.id);setEventDraft({title:ev.title||'',date:ev.date||'',place:ev.place||'',type:ev.type||'Workshop',description:ev.description||'',status:ev.status==='past'?'past':'upcoming',link:ev.link||'',images:pics.slice()})}}} className="chip border-navy bg-white text-navy">{editing?'Close':'Edit'}</button>
+            <button type="button" disabled={busy} onClick={()=>act(()=>api.deleteEvent(ev.id))} className="chip border-coral bg-coral/10 text-coral">Remove</button>
+          </div>
+        </div>
+        {editing&&<form onSubmit={e=>{e.preventDefault();act(async()=>{await api.updateEvent(ev.id,eventDraft);setEditingId(null);setEventDraft(null)})}} className="mt-4 grid gap-3 border-t-2 border-navy/10 pt-4">
+          <EventFields value={eventDraft} onChange={setEventDraft}/>
+          <div className="flex gap-2"><button type="submit" className="btn-primary">Save changes</button><button type="button" onClick={()=>{setEditingId(null);setEventDraft(null)}} className="btn-outline">Cancel</button></div>
+        </form>}
+      </div>
+    }):<p className="p-6 text-ink/50">No events yet — add one above. Nothing shows on the public site until you do.</p>}</div>
   </div>}
 
   {active==='opportunities'&&<div className="mt-8 space-y-6">

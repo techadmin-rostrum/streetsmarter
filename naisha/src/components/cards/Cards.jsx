@@ -3,7 +3,25 @@ import { ArrowUpRight, ArrowRight, MapPin, Clock, Download, MessageCircle, Check
 import { resolveImage } from '../../lib/api'
 export function ResourceCard({title,topic='Civic foundations',time='12 min',slug,readLabel='read',meta,to,image,excerpt}){const label=meta!=null?meta:(readLabel==='read'?`${time} read`:`${readLabel}: ${time}`);const inner=<>{image&&<img src={resolveImage(image)} alt="" className="mb-4 h-36 w-full rounded-md border-2 border-navy object-cover"/>}<p className="eyebrow">{topic}</p><h3 className="mt-4 text-2xl leading-tight">{title}</h3>{excerpt&&<p className="mt-2 text-sm leading-6 text-ink/75">{excerpt}</p>}<div className="mt-8 flex items-center justify-between border-t-2 border-navy/10 pt-4 text-sm font-bold text-navy"><span>{label}</span><ArrowUpRight className="transition group-hover:translate-x-1 group-hover:-translate-y-1"/></div></>;const href=to||(slug?`/blog/${slug}`:'');return href?<Link to={href} className="card group flex flex-col justify-between p-6">{inner}</Link>:<article className="card group p-6">{inner}</article>}
 export function ArticleCard({tag='EXPLAINED',title,excerpt,time='4 min read',slug,image}){const inner=<>{image&&<img src={resolveImage(image)} alt="" className="mb-4 h-40 w-full rounded-md border-2 border-navy object-cover"/>}<p className="eyebrow">{tag}</p><h3 className="mt-2 text-2xl leading-tight">{title}</h3><p className="mt-2 text-sm leading-6 text-ink/75">{excerpt}</p><div className="mt-3 flex items-center gap-2 text-xs font-bold text-ink/60"><Clock size={14}/>{time}</div></>;return slug?<Link to={`/updates/${slug}`} className="block border-b-2 border-navy/10 py-6 transition first:pt-0 hover:opacity-80">{inner}</Link>:<article className="border-b-2 border-navy/10 py-6 first:pt-0">{inner}</article>}
-export function EventCard({date='18 AUG',title,place='Online + Bengaluru',type='Workshop',past=false,image}){return <article className={`card overflow-hidden ${past?'opacity-70':''}`}>{image&&<img src={resolveImage(image)} alt="" className="h-36 w-full border-b-2 border-navy object-cover"/>}<div className="flex gap-4 p-5"><div className={`h-fit rounded-md border-2 border-navy px-3 py-2 text-center text-xs font-black leading-4 text-navy ${past?'bg-paper':'bg-saffron'}`}>{date}</div><div><p className="eyebrow flex items-center gap-2">{type}{past&&<span className="inline-flex items-center gap-1 text-ink/55"><CheckCircle2 size={12}/>Completed</span>}</p><h3 className="mt-1 text-xl leading-tight">{title}</h3><p className="mt-3 flex items-center gap-1 text-sm text-ink/70"><MapPin size={14}/>{place}</p></div></div></article>}
+export function EventCard({date='',title,place='',type='Workshop',past=false,image,images,description,link}){
+  const pics=(images&&images.length?images:(image?[image]:[])).filter(Boolean)
+  const cover=pics[0]
+  const extra=pics.slice(1,4)
+  return <article className={`card overflow-hidden ${past?'opacity-90':''}`}>
+    {cover&&<img src={resolveImage(cover)} alt="" className="h-44 w-full border-b-2 border-navy object-cover"/>}
+    {extra.length>0&&<div className="flex gap-2 border-b-2 border-navy/15 px-5 py-3">{extra.map(src=><img key={src} src={resolveImage(src)} alt="" className="h-14 w-14 rounded-md border-2 border-navy object-cover"/>)}</div>}
+    <div className="flex gap-4 p-5">
+      {date&&<div className={`h-fit shrink-0 rounded-md border-2 border-navy px-3 py-2 text-center text-xs font-black leading-4 text-navy ${past?'bg-paper':'bg-saffron'}`}>{date}</div>}
+      <div className="min-w-0">
+        <p className="eyebrow flex items-center gap-2">{type}{past&&<span className="inline-flex items-center gap-1 text-ink/55"><CheckCircle2 size={12}/>Completed</span>}</p>
+        <h3 className="mt-1 text-xl leading-tight">{title}</h3>
+        {place&&<p className="mt-3 flex items-center gap-1 text-sm text-ink/70"><MapPin size={14}/>{place}</p>}
+        {description&&<p className="mt-2 whitespace-pre-line text-sm leading-6 text-ink/80">{description}</p>}
+        {link&&<a href={link} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-signal">Watch the session <ArrowRight size={14}/></a>}
+      </div>
+    </div>
+  </article>
+}
 export function OpportunityCard({title,org,description,deadline='Rolling',kind='Internship',link,image,note}){
   const inner=<>{image&&<img src={resolveImage(image)} alt="" className="mb-4 h-36 w-full rounded-md border-2 border-navy object-cover"/>}<p className="eyebrow">{kind}</p><h3 className="mt-3 text-2xl leading-tight">{title}</h3><p className="mt-2 text-sm font-semibold text-navy/75">{org}</p>{description&&<p className="mt-2 text-sm leading-6 text-ink/75">{description}</p>}{note&&<p className="mt-2 text-xs font-bold text-[#8A6500]">{note}</p>}<div className="mt-6 flex items-center justify-between gap-3 border-t-2 border-navy/10 pt-4 text-sm font-bold text-navy"><span>{deadline}</span><ArrowUpRight className="shrink-0 transition group-hover:translate-x-1 group-hover:-translate-y-1"/></div></>
   if(link)return <a href={link} target="_blank" rel="noopener noreferrer" className="card group flex flex-col justify-between p-6">{inner}</a>

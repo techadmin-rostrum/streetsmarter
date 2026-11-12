@@ -1,19 +1,19 @@
 export const IMPACT_GROUPS = [
-  { key: 'reach', title: 'Reach', blurb: 'Teenagers who sat in a session, and the schools and cities those sessions covered.', fields: [
-    ['studentsTrained', 'Students trained'],
+  { key: 'reach', title: 'Who we reached', blurb: 'Teenagers who sat in a session, and where those sessions were.', fields: [
+    ['studentsTrained', 'Students in a session'],
     ['schoolsVisited', 'Schools visited'],
     ['citiesCovered', 'Cities covered'],
   ]},
-  { key: 'voterRegistration', title: 'Voter registration', blurb: 'Teenagers who started the process of getting on the electoral roll.', fields: [
+  { key: 'voterRegistration', title: 'Voting', blurb: 'Teenagers who started getting on the voter roll.', fields: [
     ['formsSubmitted', 'Forms submitted'],
     ['rollConfirmations', 'Names confirmed on the roll'],
   ]},
-  { key: 'scholarships', title: 'Scholarships', blurb: 'Applications started after a session, and the money students actually received.', fields: [
-    ['applications', 'Applications'],
-    ['rupeeValue', 'Value applied for'],
+  { key: 'scholarships', title: 'Scholarships', blurb: 'Applications started after a session, and the money that followed.', fields: [
+    ['applications', 'Applications started'],
+    ['rupeeValue', 'Money applied for'],
     ['disbursements', 'Money received'],
   ]},
-  { key: 'rti', title: 'Right to information', blurb: 'Questions filed with government offices, and the answers that came back.', fields: [
+  { key: 'rti', title: 'Right to information', blurb: 'Questions sent to a government office, and what came back.', fields: [
     ['filed', 'Requests filed'],
     ['responsesReceived', 'Replies received'],
     ['issuesResolved', 'Issues resolved'],
@@ -22,10 +22,10 @@ export const IMPACT_GROUPS = [
     ['cybercrimeReports', 'Cybercrime reports'],
     ['scamComplaints', 'Scam complaints'],
   ]},
-  { key: 'financialInclusion', title: 'Money basics', blurb: 'Bank accounts, PAN cards and DigiLocker set up with a guide in hand.', fields: [
-    ['bankAccounts', 'Bank accounts'],
+  { key: 'financialInclusion', title: 'Money basics', blurb: 'Accounts and documents set up with a guide in hand.', fields: [
+    ['bankAccounts', 'Bank accounts opened'],
     ['panApplications', 'PAN applications'],
-    ['digilockerActivations', 'DigiLocker activations'],
+    ['digilockerActivations', 'DigiLocker set up'],
   ]},
 ]
 

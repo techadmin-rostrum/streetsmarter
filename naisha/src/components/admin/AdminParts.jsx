@@ -29,6 +29,26 @@ export function ImageField({value,onChange,label='Picture'}){
     {error&&<p className="mt-1 text-xs font-bold text-coral">{error}</p>}
   </div>
 }
+export function ImageListField({images=[],onChange,label='Pictures'}){
+  const [busy,setBusy]=useState(false)
+  const [error,setError]=useState('')
+  async function handleFile(e){
+    const file=e.target.files?.[0]
+    e.target.value=''
+    if(!file)return
+    setBusy(true);setError('')
+    try{const{url}=await api.uploadImage(file);onChange([...(images||[]),url])}catch(err){setError(err.message)}finally{setBusy(false)}
+  }
+  return <div>
+    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-ink/50">{label}</p>
+    {(images||[]).length>0&&<div className="mb-3 flex flex-wrap gap-3">{images.map(src=><div key={src} className="flex items-center gap-2"><img src={resolveImage(src)} alt="" className="h-16 w-16 rounded-lg border-2 border-navy object-cover"/><button type="button" onClick={()=>onChange(images.filter(item=>item!==src))} className="chip bg-coral/10 text-coral"><X size={13}/> Remove</button></div>)}</div>}
+    <label className="flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-dashed border-ink/25 px-4 py-3 text-sm font-bold text-ink/60 transition hover:border-civic hover:text-civic">
+      <ImagePlus size={16}/>{busy?'Uploading…':'Add picture'}
+      <input type="file" accept="image/*" className="hidden" onChange={handleFile} disabled={busy}/>
+    </label>
+    {error&&<p className="mt-1 text-xs font-bold text-coral">{error}</p>}
+  </div>
+}
 export function ImageCell({src,onRemove}){
   if(!src)return null
   return <div className="mb-2 flex items-center gap-2"><img src={resolveImage(src)} alt="" className="h-10 w-10 rounded-lg object-cover"/><button type="button" onClick={onRemove} className="chip bg-coral/10 text-[11px] text-coral"><X size={11}/> Remove picture</button></div>
@@ -109,6 +129,7 @@ export function ImpactEditor({ value, onSave, busy }) {
       {IMPACT_GROUPS.map(group => (
         <fieldset key={group.key} className="panel p-6">
           <legend className="font-display text-2xl text-navy">{group.title}</legend>
+          <p className="mt-1 text-sm leading-6 text-ink/60">{group.blurb}</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             {group.fields.map(([key, label]) => (
               <label key={key} className="block text-sm font-bold text-ink/70">{label}

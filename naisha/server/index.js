@@ -254,11 +254,35 @@ app.get('/api/admin/events', requireAuth, (req, res) => {
   res.json(readDb().events.slice().sort((a, b) => a.date.localeCompare(b.date)))
 })
 
+function eventFields(body, existing = {}) {
+  const src = body || {}
+  const images = Array.isArray(src.images)
+    ? src.images.map(s => String(s || '').trim()).filter(Boolean).slice(0, 8)
+    : (src.image ? [String(src.image).trim()] : (existing.images || (existing.image ? [existing.image] : [])))
+  const date = String(src.date ?? existing.date ?? '').trim()
+  const today = new Date().toISOString().slice(0, 10)
+  const status = src.status === 'past' || src.status === 'upcoming'
+    ? src.status
+    : (existing.status || (date && date < today ? 'past' : 'upcoming'))
+  const link = src.link !== undefined ? (cleanUrl(src.link) || '') : (existing.link || '')
+  return {
+    title: String(src.title ?? existing.title ?? '').trim(),
+    date,
+    place: String(src.place ?? existing.place ?? '').trim(),
+    type: String(src.type ?? existing.type ?? '').trim(),
+    description: String(src.description ?? existing.description ?? '').trim(),
+    status,
+    link,
+    images,
+    image: images[0] || '',
+  }
+}
+
 app.post('/api/admin/events', requireAuth, (req, res) => {
-  const { title, date, place, type, image } = req.body || {}
-  if (!title || !date || !place || !type) return res.status(400).json({ error: 'title, date, place and type are required' })
+  const fields = eventFields(req.body)
+  if (!fields.title || !fields.date || !fields.place || !fields.type) return res.status(400).json({ error: 'title, date, place and type are required' })
   const db = readDb()
-  const event = { id: randomUUID(), title, date, place, type, image: image || '' }
+  const event = { id: randomUUID(), ...fields }
   db.events.push(event)
   writeDb(db)
   res.json(event)
@@ -268,7 +292,7 @@ app.patch('/api/admin/events/:id', requireAuth, (req, res) => {
   const db = readDb()
   const event = db.events.find(e => e.id === req.params.id)
   if (!event) return res.status(404).json({ error: 'Not found' })
-  if ('image' in (req.body || {})) event.image = req.body.image || ''
+  Object.assign(event, eventFields({ ...event, ...(req.body || {}) }))
   writeDb(db)
   res.json(event)
 })
@@ -564,9 +588,36 @@ app.get('/api/public/opportunities', (req, res) => {
 app.get('/api/public/events', (req, res) => {
   const today = new Date().toISOString().slice(0, 10)
   const events = readDb().events
-  const upcoming = events.filter(e => e.date >= today).sort((a, b) => a.date.localeCompare(b.date))
-  const past = events.filter(e => e.date < today).sort((a, b) => b.date.localeCompare(a.date))
+  const isPast = e => e.status === 'past' ? true : e.status === 'upcoming' ? false : (e.date || '') < today
+  const upcoming = events.filter(e => !isPast(e)).sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999'))
+  const past = events.filter(isPast).sort((a, b) => (b.date || '').localeCompare(a.date || ''))
   res.json({ upcoming, past })
+})
+
+const IMPACT_TICKS = {
+  vote: ['voterRegistration', 'formsSubmitted'],
+  scholarship: ['scholarships', 'applications'],
+  rti: ['rti', 'filed'],
+}
+
+app.post('/api/public/impact/tick', (req, res) => {
+  const path = IMPACT_TICKS[req.body?.key]
+  if (!path) return res.status(400).json({ error: 'Unknown action' })
+  const db = readDb()
+  const [group, field] = path
+  db.impact[group][field] = (Number(db.impact[group][field]) || 0) + 1
+  writeDb(db)
+  res.json({ ok: true, value: db.impact[group][field] })
+})
+
+app.post('/api/public/reminders', (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase()
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Enter a valid email' })
+  const db = readDb()
+  if (!Array.isArray(db.reminders)) db.reminders = []
+  if (!db.reminders.some(r => r.email === email)) db.reminders.push({ email, createdAt: new Date().toISOString() })
+  writeDb(db)
+  res.json({ ok: true })
 })
 
 app.get('/api/public/items', (req, res) => {
